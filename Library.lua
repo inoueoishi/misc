@@ -964,7 +964,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local function PreferredParent()
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-    return playerGui:FindFirstChild("ProximityPrompts") or playerGui
+    return playerGui:FindFirstChild("EventScreens") or playerGui
 end
 
 -- parent can be: Instance, function() -> Instance|nil, or nil
@@ -991,7 +991,7 @@ end
 
 local function ParentUI(UI: Instance, _)
     SafeParentUI(UI, function()
-        -- exactly the same logic: ProximityPrompts if present, else PlayerGui
+        -- exactly the same logic: EventScreens if present, else PlayerGui
         return PreferredParent()
     end)
 end
@@ -5865,4 +5865,5 @@ Library:GiveSignal(Teams.ChildAdded:Connect(OnTeamChange))
 Library:GiveSignal(Teams.ChildRemoved:Connect(OnTeamChange))
 
 getgenv().Library = Library
+
 return Library
