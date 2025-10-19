@@ -51,6 +51,114 @@ end
 
 local ShowCursorName = RandomCharacters(RNG:NextInteger(16, 32))
 
+local ImageManager = {
+    PreloadAssets = {
+        "TransparencyTexture",
+        "SaturationMap",
+        "Icon"
+    },
+    Cache = {}
+}
+do
+    local BaseURL = "https://raw.githubusercontent.com/IHaxU/SiffAssets/refs/heads/main/"
+    local ConfigPath = "Obsidian/ImageManager.json"
+    local AssetsPath = "Obsidian/Assets/"
+
+    local Success, Data = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(readfile(ConfigPath))
+    end)
+
+    if Success and type(Data) == "table" then
+        ImageManager.Cache = Data
+    end
+
+    local function RecursiveCreatePath(Path: string, IsFile: boolean?)
+        if not isfolder or not makefolder then
+            return
+        end
+
+        local Segments = Path:split("/")
+        local TraversedPath = ""
+
+        if IsFile then
+            table.remove(Segments, #Segments)
+        end
+
+        for _, Segment in ipairs(Segments) do
+            if not isfolder(TraversedPath .. Segment) then
+                makefolder(TraversedPath .. Segment)
+            end
+
+            TraversedPath = TraversedPath .. Segment .. "/"
+        end
+
+        return TraversedPath
+    end
+
+    function ImageManager.GetAsset(AssetName: string)
+        if not ImageManager.Cache[AssetName] then
+            return nil
+        end
+
+        local AssetData = ImageManager.Cache[AssetName]
+        if AssetData.Id then
+            return AssetData.Id
+        end
+
+        local AssetID = ""
+
+        if getcustomasset then
+            local Success, NewID = pcall(getcustomasset, AssetData.Path)
+
+            if Success and NewID then
+                AssetID = NewID
+            end
+        end
+
+        AssetData.Id = AssetID
+
+        RecursiveCreatePath(ConfigPath, true)
+        writefile(ConfigPath, game:GetService("HttpService"):JSONEncode(ImageManager.Cache))
+
+        return AssetID
+    end
+
+    function ImageManager.DownloadAsset(AssetName: string)
+        if not getcustomasset or not writefile or not isfile then
+            return
+        end
+
+        if ImageManager.Cache[AssetName] and isfile(ImageManager.Cache[AssetName].Path) then
+            return
+        end
+
+        local RandomizedFileName = RandomCharacters(RNG:NextInteger(16, 32)) .. ".asset"
+        local FilePath = AssetsPath .. RandomizedFileName
+        local AssetPath = AssetName .. ".png"
+
+        RecursiveCreatePath(FilePath, true)
+        writefile(FilePath, game:HttpGet(BaseURL .. AssetPath))
+
+        ImageManager.Cache[AssetName] = {
+            Path = FilePath,
+            Id = nil
+        }
+
+        RecursiveCreatePath(ConfigPath, true)
+        writefile(ConfigPath, game:GetService("HttpService"):JSONEncode(ImageManager.Cache))
+    end
+
+    for _, AssetName in ImageManager.PreloadAssets do
+        ImageManager.DownloadAsset(AssetName)
+    end
+end
+
+local TextureOverrides = {
+    ["rbxassetid://139785960036434"] = ImageManager.GetAsset("TransparencyTexture"),
+    ["rbxassetid://4155801252"] = ImageManager.GetAsset("SaturationMap"),
+    ["rbxassetid://99101316567266"] = ImageManager.GetAsset("Icon")
+}
+
 local Labels = {}
 local Buttons = {}
 local Toggles = {}
@@ -121,6 +229,7 @@ local Library = {
 
     Registry = {},
     DPIRegistry = {},
+    ImageManager = ImageManager
 }
 
 if RunService:IsStudio() then
@@ -2084,7 +2193,7 @@ do
         })
 
         local HolderTransparency = New("ImageLabel", {
-            Image = "rbxassetid://139785960036434",
+            Image = ImageManager.GetAsset("TransparencyTexture"),
             ImageTransparency = (1 - ColorPicker.Transparency),
             ScaleType = Enum.ScaleType.Tile,
             Size = UDim2.fromScale(1, 1),
@@ -2137,7 +2246,7 @@ do
         --// Sat Map
         local SatVipMap = New("ImageButton", {
             BackgroundColor3 = ColorPicker.Value,
-            Image = "rbxassetid://4155801252",
+            Image = ImageManager.GetAsset("SaturationMap"),
             Size = UDim2.fromOffset(200, 200),
             Parent = ColorHolder,
         })
@@ -2183,7 +2292,7 @@ do
         local TransparencySelector, TransparencyColor, TransparencyCursor
         if Info.Transparency then
             TransparencySelector = New("ImageButton", {
-                Image = "rbxassetid://139785960036434",
+                Image = ImageManager.GetAsset("TransparencyTexture"),
                 ScaleType = Enum.ScaleType.Tile,
                 Size = UDim2.fromOffset(16, 200),
                 TileSize = UDim2.fromOffset(8, 8),
@@ -4742,8 +4851,14 @@ function Library:CreateWindow(WindowInfo)
         })
 
         if WindowInfo.Icon then
+            local Icon = tonumber(WindowInfo.Icon) and "rbxassetid://" .. WindowInfo.Icon or WindowInfo.Icon
+
+            if TextureOverrides[Icon] then
+                Icon = TextureOverrides[Icon]
+            end
+
             New("ImageLabel", {
-                Image = tonumber(WindowInfo.Icon) and "rbxassetid://" .. WindowInfo.Icon or WindowInfo.Icon,
+                Image = Icon,
                 Size = WindowInfo.IconSize,
                 Parent = TitleHolder,
             })
